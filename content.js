@@ -38,11 +38,11 @@ function scanAndInject() {
 
         const value = input ? input.value : textContent;
 
-        if (input || (value && value !== '-' && value.length > 0)) {
+        if (input || value && value !== '-' && value.length > 0) {
             // If the field is a div element, inject both Print and Generate buttons
             // Otherwise (e.g. span, td), inject only the Print button
             const showGenerate = field.tagName === 'DIV';
-            injectButtons(field, value || '', showGenerate);
+            injectButtons(field, value, showGenerate);
         }
     });
 
@@ -84,13 +84,29 @@ function createPrintButton(field) {
         <span>${PRINT_BUTTON_TEXT}</span>
     `;
 
+    const input = field.querySelector('input');
+    const getBarcode = () => input ? input.value : field.textContent.trim();
+
+    const updateDisabledState = () => {
+        btn.disabled = !getBarcode();
+    };
+
+    // Set initial state
+    updateDisabledState();
+
+    // Listen for changes
+    if (input) {
+        input.addEventListener('input', updateDisabledState);
+        input.addEventListener('change', updateDisabledState);
+    }
+
     btn.onclick = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        // Read the latest barcode value at click time
-        const input = field.querySelector('input');
-        const barcode = input ? input.value : field.textContent.trim();
-        openPrintModal(barcode);
+        const barcode = getBarcode();
+        if (barcode) {
+            openPrintModal(barcode);
+        }
     };
 
     return btn;

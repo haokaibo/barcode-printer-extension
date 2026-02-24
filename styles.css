@@ -25,9 +25,16 @@
     text-decoration: none;
 }
 
-.barcode-btn:hover {
+.barcode-btn:not(:disabled):hover {
     background-color: #ccfbf1;
     /* teal-100 */
+}
+
+.barcode-btn:disabled {
+    background-color: #f3f4f6;
+    color: #9ca3af;
+    border-color: #d1d5db;
+    cursor: not-allowed;
 }
 
 .barcode-btn svg {
