@@ -1,6 +1,8 @@
 // --- configuration ---
-// --- configuration ---
-const BUTTON_TEXT = "Print Barcode";
+const PRINT_BUTTON_TEXT = "Print Barcode";
+const GENERATE_BUTTON_TEXT = "Generate Barcode";
+const DEFAULT_BARCODE = "123456789012";
+const STORAGE_KEY = "lastGeneratedBarcode";
 
 // --- Main Execution ---
 function init() {
@@ -9,12 +11,12 @@ function init() {
         // Debounce slightly if needed, but usually safe to run
         scanAndInject();
     });
-    
+
     observer.observe(document.body, {
         childList: true,
         subtree: true
     });
-    
+
     // Initial scan
     scanAndInject();
 }
@@ -33,11 +35,11 @@ function scanAndInject() {
         const input = field.querySelector('input');
         // 2. Check for text content (Read-only mode)
         const textContent = field.textContent.trim();
-        
+
         const value = input ? input.value : textContent;
 
         if (value && value !== '-' && value.length > 0) {
-            injectButton(field, value);
+            injectButtons(field, value);
         }
     });
 
@@ -51,14 +53,14 @@ function scanAndInject() {
                 // Navigate up to find the row/grid container
                 let container = el.closest('.grid') || el.parentElement?.parentElement;
                 if (container) {
-                    // Try to find the value container. 
+                    // Try to find the value container.
                     // In the mock it was .odoo-value, in others it might be the last child
                     const valueDiv = container.querySelector('.odoo-value') || container.children[1];
-                    
+
                     if (valueDiv && !valueDiv.querySelector('.barcode-printer-container')) {
                         const val = valueDiv.textContent.trim();
                         if (val && val !== "Barcode" && val !== '-') { // specific check to ensure we didn't grab the label itself
-                             injectButton(valueDiv, val);
+                            injectButtons(valueDiv, val);
                         }
                     }
                 }
@@ -67,29 +69,47 @@ function scanAndInject() {
     }
 }
 
-function injectButton(container, barcode) {
+function injectButtons(container, barcode) {
     // Create a wrapper to ensure it sits on a new line (block level)
     const wrapper = document.createElement('div');
     wrapper.className = 'barcode-printer-container';
-    
-    const btn = document.createElement('button');
-    btn.className = 'barcode-print-btn';
-    btn.innerHTML = `
+
+    const printBarcodeBtn = document.createElement('button');
+    printBarcodeBtn.className = 'barcode-btn';
+    printBarcodeBtn.innerHTML = `
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="6 9 6 2 18 2 18 9"></polyline>
             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
             <rect x="6" y="14" width="12" height="8"></rect>
         </svg>
-        <span>${BUTTON_TEXT}</span>
+        <span>${PRINT_BUTTON_TEXT}</span>
     `;
-    
-    btn.onclick = (e) => {
+
+    printBarcodeBtn.onclick = (e) => {
         e.preventDefault();
         e.stopPropagation();
         openPrintModal(barcode);
     };
-    
-    wrapper.appendChild(btn);
+
+    const generateBarcodeBtn = document.createElement('button');
+    generateBarcodeBtn.className = 'barcode-btn';
+    generateBarcodeBtn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+        </svg>
+        <span>${GENERATE_BUTTON_TEXT}</span>
+    `;
+
+    generateBarcodeBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        generateBarcode();
+    };
+
+    wrapper.appendChild(printBarcodeBtn);
+    wrapper.appendChild(generateBarcodeBtn);
     container.appendChild(wrapper);
 }
 
@@ -108,7 +128,7 @@ function openPrintModal(barcode) {
     const modal = document.createElement('div');
     modal.id = 'barcode-printer-modal';
     modal.className = 'bp-modal-overlay';
-    
+
     modal.innerHTML = `
         <div class="bp-modal">
             <div class="bp-header">
@@ -117,7 +137,7 @@ function openPrintModal(barcode) {
             </div>
             <div class="bp-body">
                 <p class="bp-subtitle">Configure label size and copies.</p>
-                
+
                 <div class="bp-grid">
                     <div>
                         <label>WIDTH (MM)</label>
@@ -165,17 +185,17 @@ function openPrintModal(barcode) {
     const updatePreview = () => {
         const w = parseFloat(inputs.width.value) || 30;
         const h = parseFloat(inputs.height.value) || 20;
-        
+
         // 1mm ~ 3.78px for screen
         const pxPerMm = 3.78;
         const paddingPx = 2 * pxPerMm; // 2mm margin
-        
+
         inputs.previewBox.style.width = `${w * pxPerMm}px`;
         inputs.previewBox.style.height = `${h * pxPerMm}px`;
         inputs.previewBox.style.paddingLeft = `${paddingPx}px`;
         inputs.previewBox.style.paddingRight = `${paddingPx}px`;
         inputs.previewBox.style.boxSizing = 'border-box';
-        
+
         // Use an external API for the preview image
         inputs.previewImg.src = `https://bwipjs-api.metafloor.com/?bcid=code128&text=${barcode}&scale=3&height=12&includetext&paddingwidth=0&paddingheight=0`;
     };
@@ -184,14 +204,14 @@ function openPrintModal(barcode) {
         const w = inputs.width.value;
         const h = inputs.height.value;
         const c = inputs.copies.value;
-        
+
         performPrint(barcode, w, h, c);
         modal.remove();
     };
 
     inputs.width.oninput = updatePreview;
     inputs.height.oninput = updatePreview;
-    
+
     modal.querySelector('#bp-close').onclick = () => modal.remove();
     modal.querySelector('#bp-cancel').onclick = () => modal.remove();
     modal.querySelector('#bp-print').onclick = handlePrint;
@@ -261,49 +281,78 @@ function performPrint(barcode, width, height, copies) {
                 </html>
         `;
 
-        printWindow.document.write(htmlContent);
-        printWindow.document.close();
-        printWindow.focus();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    printWindow.focus();
 
-        // Call print() from the opener instead of injecting inline scripts into the
-        // new window (CSP may block inline scripts). Wait for images to load, then
-        // bring up the print dialog. Do NOT auto-close so the user can change options.
-        const tryPrint = () => {
-            try {
-                const imgs = Array.from(printWindow.document.images || []);
-                if (imgs.length === 0) {
-                    printWindow.focus();
-                    printWindow.print();
-                    return;
-                }
-                let loaded = 0;
-                const done = () => {
-                    if (loaded >= imgs.length) {
-                        printWindow.focus();
-                        setTimeout(() => printWindow.print(), 100);
-                    }
-                };
-                imgs.forEach(img => {
-                    if (img.complete) {
-                        loaded++;
-                        done();
-                    } else {
-                        img.addEventListener('load', () => { loaded++; done(); });
-                        img.addEventListener('error', () => { loaded++; done(); });
-                    }
-                });
-            } catch (e) {
-                // If cross-window access fails for any reason, fallback to a delayed print
-                setTimeout(() => {
-                    try { printWindow.focus(); printWindow.print(); } catch (err) {}
-                }, 300);
+    // Call print() from the opener instead of injecting inline scripts into the
+    // new window (CSP may block inline scripts). Wait for images to load, then
+    // bring up the print dialog. Do NOT auto-close so the user can change options.
+    const tryPrint = () => {
+        try {
+            const imgs = Array.from(printWindow.document.images || []);
+            if (imgs.length === 0) {
+                printWindow.focus();
+                printWindow.print();
+                return;
             }
-        };
+            let loaded = 0;
+            const done = () => {
+                if (loaded >= imgs.length) {
+                    printWindow.focus();
+                    setTimeout(() => printWindow.print(), 100);
+                }
+            };
+            imgs.forEach(img => {
+                if (img.complete) {
+                    loaded++;
+                    done();
+                } else {
+                    img.addEventListener('load', () => { loaded++; done(); });
+                    img.addEventListener('error', () => { loaded++; done(); });
+                }
+            });
+        } catch (e) {
+            // If cross-window access fails for any reason, fallback to a delayed print
+            setTimeout(() => {
+                try { printWindow.focus(); printWindow.print(); } catch (err) { }
+            }, 300);
+        }
+    };
 
-        // Start checking shortly after write/close to allow resources to begin loading.
-        setTimeout(tryPrint, 50);
+    // Start checking shortly after write/close to allow resources to begin loading.
+    setTimeout(tryPrint, 50);
+}
+
+function generateBarcode() {
+    const odooFields = document.querySelectorAll('[name="barcode"]');
+
+    // Retrieve the last generated barcode from chrome storage
+    chrome.storage.local.get(STORAGE_KEY, (result) => {
+        const lastBarcode = result[STORAGE_KEY] || DEFAULT_BARCODE;
+
+        // Increment the barcode by 1
+        // Parse as a number, add 1, and pad back to the same length
+        const barcodeNum = BigInt(lastBarcode) + 1n;
+        const newBarcode = barcodeNum.toString().padStart(lastBarcode.length, '0');
+
+        odooFields.forEach(field => {
+            // Only works in Edit mode where the barcode is an input
+            const input = field.querySelector('input[type="text"]');
+            if (input) {
+                input.value = newBarcode;
+                // Dispatch input event so Odoo picks up the change
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
+
+        // Store the new barcode for next time
+        chrome.storage.local.set({ [STORAGE_KEY]: newBarcode }, () => {
+            console.log(`Barcode generated: ${newBarcode} (previous: ${lastBarcode})`);
+        });
+    });
 }
 
 // Start
-init();
 init();
