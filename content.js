@@ -38,11 +38,11 @@ function scanAndInject() {
 
         const value = input ? input.value : textContent;
 
-        if (value && value !== '-' && value.length > 0) {
+        if (input || (value && value !== '-' && value.length > 0)) {
             // If the field is a div element, inject both Print and Generate buttons
             // Otherwise (e.g. span, td), inject only the Print button
             const showGenerate = field.tagName === 'DIV';
-            injectButtons(field, value, showGenerate);
+            injectButtons(field, value || '', showGenerate);
         }
     });
 
