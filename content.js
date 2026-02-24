@@ -28,7 +28,7 @@ function scanAndInject() {
 
     odooFields.forEach(field => {
         // Skip if we already injected the button
-        if (field.querySelector('.barcode-printer-container')) return;
+        if (field.querySelector('.barcode-container')) return;
 
         // Determine the barcode value
         // 1. Check for input (Edit mode)
@@ -39,7 +39,10 @@ function scanAndInject() {
         const value = input ? input.value : textContent;
 
         if (value && value !== '-' && value.length > 0) {
-            injectButtons(field, value);
+            // If the field is a div element, inject both Print and Generate buttons
+            // Otherwise (e.g. span, td), inject only the Print button
+            const showGenerate = field.tagName === 'DIV';
+            injectButtons(field, value, showGenerate);
         }
     });
 
@@ -57,10 +60,10 @@ function scanAndInject() {
                     // In the mock it was .odoo-value, in others it might be the last child
                     const valueDiv = container.querySelector('.odoo-value') || container.children[1];
 
-                    if (valueDiv && !valueDiv.querySelector('.barcode-printer-container')) {
+                    if (valueDiv && !valueDiv.querySelector('.barcode-container')) {
                         const val = valueDiv.textContent.trim();
                         if (val && val !== "Barcode" && val !== '-') { // specific check to ensure we didn't grab the label itself
-                            injectButtons(valueDiv, val);
+                            injectButtons(valueDiv, val, false);
                         }
                     }
                 }
@@ -69,14 +72,10 @@ function scanAndInject() {
     }
 }
 
-function injectButtons(container, barcode) {
-    // Create a wrapper to ensure it sits on a new line (block level)
-    const wrapper = document.createElement('div');
-    wrapper.className = 'barcode-printer-container';
-
-    const printBarcodeBtn = document.createElement('button');
-    printBarcodeBtn.className = 'barcode-btn';
-    printBarcodeBtn.innerHTML = `
+function createPrintButton(field) {
+    const btn = document.createElement('button');
+    btn.className = 'barcode-btn';
+    btn.innerHTML = `
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="6 9 6 2 18 2 18 9"></polyline>
             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
@@ -85,15 +84,22 @@ function injectButtons(container, barcode) {
         <span>${PRINT_BUTTON_TEXT}</span>
     `;
 
-    printBarcodeBtn.onclick = (e) => {
+    btn.onclick = (e) => {
         e.preventDefault();
         e.stopPropagation();
+        // Read the latest barcode value at click time
+        const input = field.querySelector('input');
+        const barcode = input ? input.value : field.textContent.trim();
         openPrintModal(barcode);
     };
 
-    const generateBarcodeBtn = document.createElement('button');
-    generateBarcodeBtn.className = 'barcode-btn';
-    generateBarcodeBtn.innerHTML = `
+    return btn;
+}
+
+function createGenerateButton() {
+    const btn = document.createElement('button');
+    btn.className = 'barcode-btn';
+    btn.innerHTML = `
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="6 9 6 2 18 2 18 9"></polyline>
             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
@@ -102,14 +108,26 @@ function injectButtons(container, barcode) {
         <span>${GENERATE_BUTTON_TEXT}</span>
     `;
 
-    generateBarcodeBtn.onclick = (e) => {
+    btn.onclick = (e) => {
         e.preventDefault();
         e.stopPropagation();
         generateBarcode();
     };
 
-    wrapper.appendChild(printBarcodeBtn);
-    wrapper.appendChild(generateBarcodeBtn);
+    return btn;
+}
+
+function injectButtons(container, barcode, showGenerate) {
+    // Create a wrapper to ensure it sits on a new line (block level)
+    const wrapper = document.createElement('div');
+    wrapper.className = 'barcode-container';
+
+    wrapper.appendChild(createPrintButton(container));
+
+    if (showGenerate) {
+        wrapper.appendChild(createGenerateButton());
+    }
+
     container.appendChild(wrapper);
 }
 
