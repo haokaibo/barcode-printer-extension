@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Extension build artifacts
+extension-build/
+*.crx
+
+# Private signing key (NEVER commit this)
+*.pem
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
