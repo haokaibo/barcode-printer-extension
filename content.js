@@ -85,7 +85,16 @@ function createPrintButton(field) {
     `;
 
     const input = field.querySelector('input');
-    const getBarcode = () => input ? input.value : field.textContent.trim();
+    const getBarcode = () => {
+        if (input) return input.value;
+        // In read-only mode, extract only the direct text content (first child node generally)
+        for (let node of field.childNodes) {
+            if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() !== '') {
+                return node.nodeValue.trim();
+            }
+        }
+        return '';
+    };
 
     const updateDisabledState = () => {
         btn.disabled = !getBarcode();
